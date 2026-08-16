@@ -216,7 +216,8 @@ def ensure_requirements():
             log("pip requirements warn: " + str(e)[:150])
     # 2) FORCA os pins EXATOS do notebook (rebaixa/atualiza mesmo se outra versao ja
     #    instalada — o try/except de import nao pega versao errada ja presente)
-    for _pin in ("mmgp==3.7.12", "gradio==5.29.0", "optimum-quanto==0.2.7", "smplfitter==0.2.10"):
+    for _pin in ("mmgp==3.7.12", "gradio==5.29.0", "optimum-quanto==0.2.7",
+                 "smplfitter==0.2.10", "torchao>=0.16.0"):
         try:
             subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", _pin], timeout=600)
         except Exception as _e:

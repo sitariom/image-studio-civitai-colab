@@ -1395,8 +1395,13 @@ def _quantize_model(pipe, method, family):
         return False
     try:
         if method == "torchao_int8":
-            from torchao.quantization import quantize_, weight_only_int8
-            quantize_(model, weight_only_int8())
+            try:
+                from torchao.quantization import quantize_, weight_only_int8
+                quantize_(model, weight_only_int8())
+            except Exception:
+                from torchao.quantization.quant_api import quantize_ as _q2
+                from torchao.quantization.quant_api import weight_only_int8 as _wo8
+                _q2(model, _wo8())
             print("  Quantizado INT8 (torchao) — " + family)
             return True
         if method == "fp8_e4m3fn":
@@ -1750,7 +1755,8 @@ def ensure_requirements():
             log("pip requirements warn: " + str(e)[:150])
     # 2) FORCA os pins EXATOS do notebook (rebaixa/atualiza mesmo se outra versao ja
     #    instalada — o try/except de import nao pega versao errada ja presente)
-    for _pin in ("mmgp==3.7.12", "gradio==5.29.0", "optimum-quanto==0.2.7", "smplfitter==0.2.10"):
+    for _pin in ("mmgp==3.7.12", "gradio==5.29.0", "optimum-quanto==0.2.7",
+                 "smplfitter==0.2.10", "torchao>=0.16.0"):
         try:
             subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", _pin], timeout=600)
         except Exception as _e:
@@ -1951,9 +1957,6 @@ def main():
     srv.serve_forever()
 
 
-
-    # ---- Handlers da aba LoRA / VAE / TI ----
-
 if __name__ == "__main__":
     main()
 """
@@ -2013,7 +2016,8 @@ def _ensure_wan2gp_deps(progress_cb=None):
                                    "--timeout", "120", "--retries", "5", "-r", reqs_txt], timeout=1200)
         except Exception as e:
             print("  WARN pip requirements:", str(e)[:150])
-    for _pin in ("mmgp==3.7.12", "gradio==5.29.0", "optimum-quanto==0.2.7", "smplfitter==0.2.10"):
+    for _pin in ("mmgp==3.7.12", "gradio==5.29.0", "optimum-quanto==0.2.7",
+                 "smplfitter==0.2.10", "torchao>=0.16.0"):
         try:
             subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", _pin], timeout=600)
         except Exception as _e:

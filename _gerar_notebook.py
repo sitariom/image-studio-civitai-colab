@@ -43,7 +43,7 @@ cell_run = (
 "try:\n"
 "    import torchao\n"
 "except ImportError:\n"
-"    _pip('torchao')\n"
+"    _pip('torchao>=0.16.0')\n"
 "try:\n"
 "    import bitsandbytes\n"
 "except ImportError:\n"
