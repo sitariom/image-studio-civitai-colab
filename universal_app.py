@@ -2013,6 +2013,21 @@ def main():
             return lora_remove_one(path), gr.update(choices=lora_active_choices(), value=None)
         return "Selecione um LoRA ativo.", gr.update()
 
+    def lora_lib_load_click(path, weight):
+        if path:
+            return apply_lora_local(path, float(weight or 1.0))
+        return "Selecione um LoRA da biblioteca."
+
+    def vae_lib_load_click(path):
+        if path:
+            return apply_vae_local(path)
+        return "Selecione um VAE da biblioteca."
+
+    def ti_lib_load_click(path):
+        if path:
+            return load_ti_local(path)
+        return "Selecione um TI da biblioteca."
+
     lora_example.change(fn=lambda c: _ex_url_aux(c, LORA_EXAMPLES), inputs=[lora_example], outputs=[lora_url])
     lora_query_btn.click(fn=query_aux_click, inputs=[lora_url, civitai_token], outputs=[lora_card, lora_ver_dd, lora_status])
     lora_dl_btn.click(fn=lora_load_click, inputs=[lora_url, civitai_token, lora_ver_dd, lora_weight], outputs=[lora_status])
@@ -2021,18 +2036,22 @@ def main():
     lora_rm_btn.click(fn=lora_rm_click, inputs=[lora_active_dd], outputs=[lora_status, lora_active_dd])
     lora_lib_refresh.click(fn=lib_refresh_aux, inputs=[gr.State("lora")], outputs=[lora_lib_dd])
     lora_del_btn.click(fn=lib_del_aux, inputs=[lora_lib_dd], outputs=[lora_status])
+    lora_lib_load.click(fn=lora_lib_load_click, inputs=[lora_lib_dd, lora_weight], outputs=[lora_status])
+    lora_lib_load.click(fn=lora_active_refresh, outputs=[lora_active_dd])
 
     vae_example.change(fn=lambda c: _ex_url_aux(c, VAE_EXAMPLES), inputs=[vae_example], outputs=[vae_url])
     vae_query_btn.click(fn=query_aux_click, inputs=[vae_url, civitai_token], outputs=[vae_card, vae_ver_dd, vae_status])
     vae_dl_btn.click(fn=vae_load_click, inputs=[vae_url, civitai_token, vae_ver_dd], outputs=[vae_status])
     vae_lib_refresh.click(fn=lib_refresh_aux, inputs=[gr.State("vae")], outputs=[vae_lib_dd])
     vae_del_btn.click(fn=lib_del_aux, inputs=[vae_lib_dd], outputs=[vae_status])
+    vae_lib_load.click(fn=vae_lib_load_click, inputs=[vae_lib_dd], outputs=[vae_status])
 
     ti_example.change(fn=lambda c: _ex_url_aux(c, TI_EXAMPLES), inputs=[ti_example], outputs=[ti_url])
     ti_query_btn.click(fn=query_aux_click, inputs=[ti_url, civitai_token], outputs=[ti_card, ti_ver_dd, ti_status])
     ti_dl_btn.click(fn=ti_load_click, inputs=[ti_url, civitai_token, ti_ver_dd], outputs=[ti_status])
     ti_lib_refresh.click(fn=lib_refresh_aux, inputs=[gr.State("ti")], outputs=[ti_lib_dd])
     ti_del_btn.click(fn=lib_del_aux, inputs=[ti_lib_dd], outputs=[ti_status])
+    ti_lib_load.click(fn=ti_lib_load_click, inputs=[ti_lib_dd], outputs=[ti_status])
 
 if __name__ == "__main__":
     main()
@@ -3031,6 +3050,24 @@ LORA_EXAMPLES = [
     ("blindbox", "https://civitai.com/models/25995"),
     ("Hands XL + SD1.5 + Pony + F1D", "https://civitai.com/models/200255"),
     ("Doll Likeness - EDG", "https://civitai.com/models/42903"),
+    ("SXZ Will Murai BlizzCon Keyart (Krea2)", "https://civitai.com/models/2846061"),
+    ("Dmitry Prozorov TamplierPainter Artist", "https://civitai.com/models/1276570"),
+    ("SXZ Warcraft Animated Short (Krea2)", "https://civitai.com/models/2828764"),
+    ("SXZ Bayard Wu (Krea2)", "https://civitai.com/models/2828610"),
+    ("World of Warcraft", "https://civitai.com/models/693378"),
+    ("Satoshi Urushihara Style", "https://civitai.com/models/7227"),
+    ("Comic Book Page Style (multi-base)", "https://civitai.com/models/462611"),
+    ("Hades 2 Isometric Map", "https://civitai.com/models/1677773"),
+    ("Tensura (Slime) Anime Style", "https://civitai.com/models/430181"),
+    ("RimWorld Art Style", "https://civitai.com/models/411781"),
+    ("Gag RPG Potions LoRA XL", "https://civitai.com/models/22591"),
+    ("MohawkAddon Comics", "https://civitai.com/models/148394"),
+    ("Game Icon InstituteANFGV3", "https://civitai.com/models/143301"),
+    ("Fake Books Cthulhu Mythos", "https://civitai.com/models/139226"),
+    ("Tensura Style LoRA", "https://civitai.com/models/29829"),
+    ("Hades Style", "https://civitai.com/models/26681"),
+    ("PrintableHeroes TTRPG PaperMinis", "https://civitai.com/models/15535"),
+    ("Painted Miniature", "https://civitai.com/models/7718"),
 ]
 VAE_EXAMPLES = [
     ("vae-ft-mse-840000 (SD1.5)", "https://civitai.com/models/276082"),
@@ -3119,6 +3156,70 @@ def lora_remove_one(path):
     return "LoRA removido da pilha: " + os.path.basename(path)
 
 
+
+
+def apply_lora_local(path, weight=1.0):
+    """Aplica um LoRA JA baixado (biblioteca) — sem re-download."""
+    try:
+        if not path or not os.path.exists(path):
+            return "Arquivo nao encontrado: " + str(path)
+        STATE["lora_stack"] = [(p, w) for (p, w) in STATE["lora_stack"] if p != path]
+        STATE["lora_stack"].append((path, float(weight)))
+        STATE["lora_scale"] = float(weight)
+        if STATE.get("backend") == "diffusers" and STATE.get("pipe") is not None:
+            try:
+                STATE["pipe"].load_lora_weights(path)
+                try:
+                    STATE["pipe"].set_adapters(["default"], adapter_weights=[float(weight)])
+                except Exception:
+                    pass
+                return "LoRA aplicado da biblioteca: " + os.path.basename(path) + " (peso " + str(weight) + ")"
+            except Exception as e:
+                STATE["lora_stack"] = [(p, w) for (p, w) in STATE["lora_stack"] if p != path]
+                return "Falha ao aplicar no pipe (usa ComfyUI no load): " + str(e)[:150]
+        return "LoRA adicionado a pilha (backend " + str(STATE.get("backend")) + "): " + os.path.basename(path)
+    except Exception as e:
+        return "Erro: " + str(e)
+
+
+def apply_vae_local(path):
+    """Aplica um VAE JA baixado (biblioteca) ao modelo atual."""
+    try:
+        if not path or not os.path.exists(path):
+            return "Arquivo nao encontrado: " + str(path)
+        if STATE.get("backend") == "diffusers" and STATE.get("pipe") is not None:
+            from diffusers import AutoencoderKL
+            vae = AutoencoderKL.from_single_file(path, torch_dtype=torch.float16)
+            STATE["pipe"].vae = vae
+            try:
+                STATE["pipe"].vae.enable_tiling()
+                STATE["pipe"].vae.enable_slicing()
+            except Exception:
+                pass
+            return "VAE aplicado da biblioteca: " + os.path.basename(path)
+        return "VAE baixado (backend " + str(STATE.get("backend")) + "): " + os.path.basename(path)
+    except Exception as e:
+        return "Erro VAE: " + str(e)
+
+
+def load_ti_local(path):
+    """Registra um TI JA baixado (biblioteca)."""
+    try:
+        if not path or not os.path.exists(path):
+            return "Arquivo nao encontrado: " + str(path)
+        token_name = Path(path).stem
+        if STATE.get("backend") == "diffusers" and STATE.get("pipe") is not None:
+            try:
+                STATE["pipe"].load_textual_inversion(path)
+                return "TI carregado da biblioteca: " + os.path.basename(path) + " | use <" + token_name + "> no prompt"
+            except Exception as e:
+                return "Falha ao registrar no pipe: " + str(e)[:150]
+        d2 = os.path.join(COMFY_DIR, "models", "embeddings")
+        Path(d2).mkdir(parents=True, exist_ok=True)
+        shutil.copy(path, os.path.join(d2, os.path.basename(path)))
+        return "TI copiado p/ ComfyUI: " + os.path.basename(path) + " | use embedding:" + token_name
+    except Exception as e:
+        return "Erro TI: " + str(e)
 def lora_active_choices():
     return [os.path.basename(p) + " (w=" + str(w) + ")" for (p, w) in (STATE.get("lora_stack") or [])]
 
@@ -4234,54 +4335,76 @@ with gr.Blocks(theme=gr.themes.Soft(), css=CSS, title="Advanced Multi-Model Imag
                     cmp_gallery = gr.Gallery(label="Comparacao", columns=2, rows=1, object_fit="contain", preview=True)
 
         with gr.TabItem("LoRA / VAE / TI"):
-            gr.Markdown("### Gestao unificada — LoRA / VAE / TextualInversion (mesmo padrao dos checkpoints)")
+            gr.Markdown("### Gestao unificada — LoRA / VAE / TextualInversion (sessao independente por tipo)")
             with gr.Tabs():
-                with gr.TabItem("LoRA"):
-                    with gr.Row():
-                        lora_example = gr.Dropdown(label="Exemplos populares de LoRA", choices=[""] + [e[0] for e in LORA_EXAMPLES], value="")
-                    lora_url = gr.Textbox(label="URL ou ID do LoRA no Civitai", placeholder="https://civitai.com/models/122359 ou 122359")
-                    with gr.Row():
-                        lora_query_btn = gr.Button("🔎 Consultar LoRA", variant="secondary")
-                        lora_ver_dd = gr.Dropdown(label="Versao (mais recente primeiro)", choices=[], value=None, scale=2)
-                        lora_weight = gr.Slider(0.0, 2.0, 1.0, step=0.05, label="Peso do LoRA", scale=1)
-                    lora_card = gr.Markdown("")
-                    with gr.Row():
-                        lora_dl_btn = gr.Button("⬇️ Baixar e Ativar LoRA", variant="primary")
-                        clear_lora_btn2 = gr.Button("Remover todos LoRAs", variant="secondary")
-                        lora_rm_btn = gr.Button("Remover selecionado", variant="secondary")
-                    with gr.Row():
-                        lora_active_dd = gr.Dropdown(label="LoRAs ativos (selecione p/ remover)", choices=[], value=None, scale=2)
-                        lora_lib_refresh = gr.Button("🔄 Biblioteca LoRA", variant="secondary")
-                        lora_lib_dd = gr.Dropdown(label="LoRAs baixados (biblioteca)", choices=[], value=None, scale=2)
-                        lora_del_btn = gr.Button("🗑️ Deletar", variant="stop")
+                with gr.TabItem("🎯 LoRA"):
+                    gr.Markdown("#### LoRA — estilos/efeitos aplicados sobre o modelo carregado")
+                    with gr.Accordion("1️⃣ Consultar (exemplos + URL + versoes)", open=True):
+                        with gr.Row():
+                            lora_example = gr.Dropdown(label="Exemplos populares de LoRA (pre-cadastrados)", choices=[""] + [e[0] for e in LORA_EXAMPLES], value="")
+                        lora_url = gr.Textbox(label="URL ou ID do LoRA no Civitai", placeholder="https://civitai.com/models/122359 ou 122359")
+                        with gr.Row():
+                            lora_query_btn = gr.Button("🔎 Consultar LoRA", variant="secondary")
+                            lora_ver_dd = gr.Dropdown(label="Versao (mais recente primeiro)", choices=[], value=None, scale=2)
+                        lora_card = gr.Markdown("")
+                    with gr.Accordion("2️⃣ Baixar e Ativar (com peso)", open=False):
+                        with gr.Row():
+                            lora_weight = gr.Slider(0.0, 2.0, 1.0, step=0.05, label="Peso do LoRA", scale=2)
+                            lora_dl_btn = gr.Button("⬇️ Baixar e Ativar LoRA", variant="primary")
+                    with gr.Accordion("3️⃣ LoRAs ativos (gerenciar)", open=False):
+                        with gr.Row():
+                            lora_active_dd = gr.Dropdown(label="LoRAs ativos (selecione p/ remover)", choices=[], value=None, scale=2)
+                            lora_rm_btn = gr.Button("Remover selecionado", variant="secondary")
+                            clear_lora_btn2 = gr.Button("Remover todos", variant="secondary")
+                    with gr.Accordion("4️⃣ Biblioteca LoRA (baixados)", open=False):
+                        with gr.Row():
+                            lora_lib_refresh = gr.Button("🔄 Atualizar", variant="secondary")
+                            lora_lib_dd = gr.Dropdown(label="LoRAs baixados", choices=[], value=None, scale=2)
+                        with gr.Row():
+                            lora_lib_load = gr.Button("⬆️ Carregar da biblioteca (sem baixar)", variant="secondary")
+                            lora_del_btn = gr.Button("🗑️ Deletar", variant="stop")
                     lora_status = gr.Textbox(label="Status LoRA", lines=2)
-                with gr.TabItem("VAE"):
-                    with gr.Row():
-                        vae_example = gr.Dropdown(label="Exemplos populares de VAE", choices=[""] + [e[0] for e in VAE_EXAMPLES], value="")
-                    vae_url = gr.Textbox(label="URL ou ID do VAE no Civitai", placeholder="https://civitai.com/models/296576 ou 296576")
-                    with gr.Row():
-                        vae_query_btn = gr.Button("🔎 Consultar VAE", variant="secondary")
-                        vae_ver_dd = gr.Dropdown(label="Versao (mais recente primeiro)", choices=[], value=None, scale=2)
-                    vae_card = gr.Markdown("")
-                    vae_dl_btn = gr.Button("⬇️ Baixar e Aplicar VAE", variant="primary")
-                    with gr.Row():
-                        vae_lib_refresh = gr.Button("🔄 Biblioteca VAE", variant="secondary")
-                        vae_lib_dd = gr.Dropdown(label="VAEs baixados (biblioteca)", choices=[], value=None, scale=2)
-                        vae_del_btn = gr.Button("🗑️ Deletar", variant="stop")
+
+                with gr.TabItem("🎨 VAE"):
+                    gr.Markdown("#### VAE — decodificador de latentes (cor/qualidade da imagem)")
+                    with gr.Accordion("1️⃣ Consultar (exemplos + URL + versoes)", open=True):
+                        with gr.Row():
+                            vae_example = gr.Dropdown(label="Exemplos populares de VAE", choices=[""] + [e[0] for e in VAE_EXAMPLES], value="")
+                        vae_url = gr.Textbox(label="URL ou ID do VAE no Civitai", placeholder="https://civitai.com/models/296576 ou 296576")
+                        with gr.Row():
+                            vae_query_btn = gr.Button("🔎 Consultar VAE", variant="secondary")
+                            vae_ver_dd = gr.Dropdown(label="Versao (mais recente primeiro)", choices=[], value=None, scale=2)
+                        vae_card = gr.Markdown("")
+                    with gr.Accordion("2️⃣ Baixar e Aplicar", open=False):
+                        vae_dl_btn = gr.Button("⬇️ Baixar e Aplicar VAE ao modelo atual", variant="primary")
+                    with gr.Accordion("3️⃣ Biblioteca VAE (baixados)", open=False):
+                        with gr.Row():
+                            vae_lib_refresh = gr.Button("🔄 Atualizar", variant="secondary")
+                            vae_lib_dd = gr.Dropdown(label="VAEs baixados", choices=[], value=None, scale=2)
+                        with gr.Row():
+                            vae_lib_load = gr.Button("⬆️ Aplicar da biblioteca", variant="secondary")
+                            vae_del_btn = gr.Button("🗑️ Deletar", variant="stop")
                     vae_status = gr.Textbox(label="Status VAE", lines=2)
-                with gr.TabItem("TextualInversion"):
-                    with gr.Row():
-                        ti_example = gr.Dropdown(label="Exemplos populares de TI", choices=[""] + [e[0] for e in TI_EXAMPLES], value="")
-                    ti_url = gr.Textbox(label="URL ou ID do TI no Civitai", placeholder="https://civitai.com/models/7808 ou 7808")
-                    with gr.Row():
-                        ti_query_btn = gr.Button("🔎 Consultar TI", variant="secondary")
-                        ti_ver_dd = gr.Dropdown(label="Versao (mais recente primeiro)", choices=[], value=None, scale=2)
-                    ti_card = gr.Markdown("")
-                    ti_dl_btn = gr.Button("⬇️ Baixar e Carregar TI", variant="primary")
-                    with gr.Row():
-                        ti_lib_refresh = gr.Button("🔄 Biblioteca TI", variant="secondary")
-                        ti_lib_dd = gr.Dropdown(label="TIs baixados (biblioteca)", choices=[], value=None, scale=2)
-                        ti_del_btn = gr.Button("🗑️ Deletar", variant="stop")
+
+                with gr.TabItem("🧠 TextualInversion"):
+                    gr.Markdown("#### TI — embeddings (trigger words) via `<nome>` ou `embedding:nome` no prompt")
+                    with gr.Accordion("1️⃣ Consultar (exemplos + URL + versoes)", open=True):
+                        with gr.Row():
+                            ti_example = gr.Dropdown(label="Exemplos populares de TI", choices=[""] + [e[0] for e in TI_EXAMPLES], value="")
+                        ti_url = gr.Textbox(label="URL ou ID do TI no Civitai", placeholder="https://civitai.com/models/7808 ou 7808")
+                        with gr.Row():
+                            ti_query_btn = gr.Button("🔎 Consultar TI", variant="secondary")
+                            ti_ver_dd = gr.Dropdown(label="Versao (mais recente primeiro)", choices=[], value=None, scale=2)
+                        ti_card = gr.Markdown("")
+                    with gr.Accordion("2️⃣ Baixar e Carregar", open=False):
+                        ti_dl_btn = gr.Button("⬇️ Baixar e Carregar TI", variant="primary")
+                    with gr.Accordion("3️⃣ Biblioteca TI (baixados)", open=False):
+                        with gr.Row():
+                            ti_lib_refresh = gr.Button("🔄 Atualizar", variant="secondary")
+                            ti_lib_dd = gr.Dropdown(label="TIs baixados", choices=[], value=None, scale=2)
+                        with gr.Row():
+                            ti_lib_load = gr.Button("⬆️ Carregar da biblioteca", variant="secondary")
+                            ti_del_btn = gr.Button("🗑️ Deletar", variant="stop")
                     ti_status = gr.Textbox(label="Status TI", lines=2)
 
         with gr.TabItem("🖼️ Histórico & Galeria"):
