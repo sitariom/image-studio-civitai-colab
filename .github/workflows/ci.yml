@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    name: Validação (sintaxe + roundtrip + segredos)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar pyflakes
+        run: pip install pyflakes
+
+      - name: Validar projeto (_validate.py)
+        run: python _validate.py
+
+      - name: Verificar ausência de segredos (fail-safe)
+        run: |
+          if grep -rlE "31e722c6[0-9a-f]{24}|hf_NWQbI[A-Za-z0-9]{26}" --include="*.py" --include="*.ipynb" --include="*.txt" .; then
+            echo "::error::TOKEN encontrado nos arquivos versionados"
+            exit 1
+          fi
+          echo "Sem tokens nos arquivos."
+
+      - name: Gerar notebook e conferir roundtrip (regra de ouro)
+        run: |
+          python _gerar_notebook.py
+          python _validate.py

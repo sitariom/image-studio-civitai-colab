@@ -1,5 +1,7 @@
 # 🎨 Advanced Multi-Model Image Studio (CivitAI + Colab T4)
 
+[![CI](https://github.com/sitariom/image-studio-civitai-colab/actions/workflows/ci.yml/badge.svg)](https://github.com/sitariom/image-studio-civitai-colab/actions/workflows/ci.yml)
+
 Gerador de imagens **multi-modelo** para Google Colab (GPU T4), com suporte a **24+ famílias** de modelos do Civitai usando **3 motores em cascata**:
 
 1. **Diffusers nativo** — SD 1.5, SDXL, Pony, Illustrious, NoobAI, Animagine XL...
