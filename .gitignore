@@ -36,3 +36,49 @@ universa_app_backup_tmp
 # Sistema
 .DS_Store
 Thumbs.db
+
+# Scripts auxiliares nao essenciais (mantidos apenas localmente)
+auth_daemon.py
+authenticate_interactive.py
+authenticate_official_colab.py
+authenticate_pkce_persistent.py
+colab_account_manager.py
+colab_pkce_auth.py
+complete_auth.py
+do_auth.py
+do_colab_login.py
+google_colab_oauth.py
+login_daemon.py
+official_colab_cli.py
+persistent_pkce_auth.py
+run_colab_cell.py
+run_login_daemon.py
+save_pkce_login.py
+start_auth_listener.py
+submit_code_wsl.py
+upload_and_run.py
+wsl_auth_helper.py
+deploy_colab_autoretry.py
+deploy_new_session.py
+deploy_session.py
+deploy_to_colab.py
+patch_embed_worker.py
+patch_krea.py
+patch_krea2_final.py
+patch_krea_custom.py
+fix_numpy.py
+fix_wan2gp_deps.py
+fix_worker_paths.py
+remover_krea2_definitivo.py
+_sup.py
+_test_wan2gp.py
+_provision_loop.sh
+_push_uapp.py
+
+# Notebooks de referencia / historicos (mantidos localmente)
+Notebook_Definitivo_CivitAI_old.ipynb
+krea_2_turbo_funcional.ipynb
+krea_2_turbo_colab_implementado.ipynb
+krea-2-turbo-fast-text-to-image-generator_implementado.ipynb
+cópia_de_krea_2_turbo_colab*.py
+chat-Notebook Colab Funcionamento Profundo.txt
