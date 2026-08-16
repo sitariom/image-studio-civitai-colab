@@ -1,0 +1,38 @@
+# Segredos / tokens (NAO versionar)
+_local_secrets_backup/
+*.log
+deploy_retry*.log
+auth.log
+auth_url.txt
+current_auth_url.txt
+current_url.txt
+latest_url.txt
+latest_oauth_url.txt
+pending_url.txt
+input_code.txt
+pkce_state.json
+pkce_pending.json
+oauth_pending.json
+flow_pending.pkl
+
+# Backups locais
+backups/
+
+# CodeGraph / ferramentas
+.codegraph/
+__pycache__/
+*.pyc
+
+# Temporarios de analise/patch
+_krea2_worker_test.py
+_krea2_main_upstream.py
+_mmgp_offload_3712.py
+universa_app_backup_tmp
+
+# Colab runtime
+.stop_supervisor
+*.part
+
+# Sistema
+.DS_Store
+Thumbs.db
