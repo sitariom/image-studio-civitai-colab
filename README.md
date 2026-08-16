@@ -39,6 +39,7 @@ Gerador de imagens **multi-modelo** para Google Colab (GPU T4), com suporte a **
 | **VRAM auto-budget** | Clamp de resolução por GPU (pynvml) |
 | **Download paralelo** | aria2c (`-x16`) + resume + verificação de tamanho |
 | **Biblioteca local** | Troca de modelo sem re-download |
+| **Gestão LoRA/VAE/TI** | Aba dedicada com exemplos populares, consulta (versões + trigger words), baixar/ativar por versão, biblioteca por tipo, LoRAs ativos com remoção |
 
 ---
 
