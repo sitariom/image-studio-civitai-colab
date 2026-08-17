@@ -3127,6 +3127,7 @@ def apply_lora_local(path, weight=1.0):
         STATE["lora_stack"].append((path, float(weight)))
         STATE["lora_scale"] = float(weight)
         if STATE.get("backend") == "diffusers" and STATE.get("pipe") is not None:
+            _ensure_torchao()
             try:
                 STATE["pipe"].load_lora_weights(path)
                 try:
@@ -3186,6 +3187,20 @@ def load_ti_local(path):
         return "Erro TI: " + str(e)
 
 
+
+
+def _ensure_torchao():
+    """Garante torchao >= 0.16 (diffusers 0.36 exige p/ aplicar LoRA no pipe)."""
+    try:
+        import torchao
+        _v = [int(x) for x in str(getattr(torchao, "__version__", "0")).split(".")[:2]]
+        if _v and _v[0] == 0 and _v[1] < 16:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "torchao>=0.16.0"], timeout=600)
+    except Exception:
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "torchao>=0.16.0"], timeout=600)
+        except Exception:
+            pass
 def components_status():
     """Estado integrado dos componentes (LoRA + VAE + TI) para a proxima geracao."""
     parts = []
@@ -3213,6 +3228,7 @@ def load_lora_from_civitai(url_or_id, token, weight=1.0, version_index=0):
         STATE["lora_stack"].append((local, float(weight)))
         STATE["lora_scale"] = float(weight)
         if STATE.get("backend") == "diffusers" and STATE.get("pipe") is not None:
+            _ensure_torchao()
             try:
                 STATE["pipe"].load_lora_weights(local)
                 try:
