@@ -2157,21 +2157,39 @@ _comfy_lock = threading.Lock()
 
 
 
-def _safetensors_valid(path, min_size=1024):
-    """True se o arquivo parece um safetensors valido (header JSON parseavel)."""
+def _safetensors_valid(path, min_size=1024, verbose=False):
+    """True se o arquivo parece um safetensors valido (header JSON parseavel).
+    verbose=True imprime o motivo da falha (diagnostico)."""
     try:
         if not path or not os.path.exists(path):
+            if verbose:
+                print("  [check] arquivo nao existe:", path)
             return False
-        if os.path.getsize(path) < min_size:
+        size = os.path.getsize(path)
+        if size < min_size:
+            if verbose:
+                print("  [check] arquivo muito pequeno:", size, "bytes")
             return False
         with open(path, "rb") as f:
-            n = struct.unpack("<Q", f.read(8))[0]
-            if n <= 0 or n > 64 * 1024 * 1024:
+            raw = f.read(8)
+            n = struct.unpack("<Q", raw)[0]
+            if n <= 0 or n > 512 * 1024 * 1024:
+                if verbose:
+                    print("  [check] tamanho do header invalido:", n)
                 return False
             hdr = f.read(n)
-            json.loads(hdr.decode("utf-8", errors="replace"))
+            txt = hdr.decode("utf-8", errors="replace")
+            if txt.startswith("﻿"):
+                txt = txt[1:]
+            data = json.loads(txt)
+        if not isinstance(data, dict):
+            if verbose:
+                print("  [check] header JSON nao e um objeto")
+            return False
         return True
-    except Exception:
+    except Exception as e:
+        if verbose:
+            print("  [check] falha ao ler header: " + str(e)[:120])
         return False
 
 
@@ -2542,10 +2560,20 @@ def comfy_run(family, ckpt, prompt, negative, width, height, steps, cfg,
         family = "anima"
     template = (FAMILY_PRESETS.get(family, {}) or {}).get("comfy_template", "checkpoint")
     if template == "checkpoint" and not _safetensors_valid(ckpt):
-        raise RuntimeError(
-            "Checkpoint invalido/corrompido em " + str(ckpt) +
-            " (nao e um safetensors valido — download parcial ou arquivo errado). " +
-            "Rebaixe o modelo ou carregue-o novamente pela aba Modelo.")
+        print("  [check] checkpoint aparenta invalido em " + str(ckpt))
+        _safetensors_valid(ckpt, verbose=True)
+        mid = STATE.get("civitai_model_id")
+        if mid:
+            print("  [auto-reparo] rebaixando modelo " + str(mid) + " automaticamente...")
+            try:
+                new_local, _, _, _, _ = download_from_civitai(mid, STATE.get("civitai_token"), "Model", 0, None, True)
+                STATE["model_path"] = new_local
+                ckpt = new_local
+                print("  [auto-reparo] re-download OK: " + os.path.basename(new_local))
+            except Exception as e:
+                print("  [auto-reparo] falhou: " + str(e)[:150])
+        if not _safetensors_valid(ckpt):
+            print("  [aviso] checkpoint ainda aparenta invalido — tentando mesmo assim (o ComfyUI mostrara o erro real se o arquivo estiver corrompido).")
     comfy_ensure_aux_files(template, family)
     # UNETLoader (flux/sd3/anima) le de models/diffusion_models; CheckpointLoaderSimple de models/checkpoints
     sub_dir = "diffusion_models" if template in ("flux", "sd3", "anima") else "checkpoints"
@@ -3302,6 +3330,8 @@ def load_model_from_civitai(url_or_id, token, hf_token, version_index=0, force_c
         model_id = parse_civitai_id(url_or_id)
         if not model_id:
             return "URL/ID invalido.", None
+        STATE["civitai_model_id"] = model_id
+        STATE["civitai_wanted_type"] = "Model"
         if hf_token:
             STATE["hf_token"] = str(hf_token).strip()
         if token:
