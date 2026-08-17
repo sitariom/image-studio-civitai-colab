@@ -3180,13 +3180,15 @@ def apply_lora_local(path, weight=1.0):
             try:
                 STATE["pipe"].load_lora_weights(path)
                 try:
-                    STATE["pipe"].set_adapters(["default"], adapter_weights=[float(weight)])
+                    _anames = list(getattr(STATE["pipe"], "adapter_names", None) or [])
+                    if _anames:
+                        STATE["pipe"].set_adapters(_anames, adapter_weights=[float(weight)] * len(_anames))
                 except Exception:
                     pass
                 return "LoRA aplicado da biblioteca: " + os.path.basename(path) + " (peso " + str(weight) + ")"
             except Exception as e:
-                STATE["lora_stack"] = [(p, w) for (p, w) in STATE["lora_stack"] if p != path]
-                return "Falha ao aplicar no pipe (usa ComfyUI no load): " + str(e)[:150]
+                return ("LoRA na PILHA (diffusers nao aplicou: " + str(e)[:150] +
+                        ") — sera aplicado pelo ComfyUI no load. Ativos: " + ", ".join(lora_active_choices()))
         return "LoRA adicionado a pilha (backend " + str(STATE.get("backend")) + "): " + os.path.basename(path)
     except Exception as e:
         return "Erro: " + str(e)
@@ -3280,14 +3282,19 @@ def load_lora_from_civitai(url_or_id, token, weight=1.0, version_index=0):
             _ensure_torchao()
             try:
                 STATE["pipe"].load_lora_weights(local)
+                # set_adapters com os NOMES REAIS dos adapters (nao 'default' cego — evita
+                # 'list index out of range' quando o diffusers nomeia o adapter pelo arquivo)
                 try:
-                    STATE["pipe"].set_adapters(["default"], adapter_weights=[float(weight)])
+                    _anames = list(getattr(STATE["pipe"], "adapter_names", None) or [])
+                    if _anames:
+                        STATE["pipe"].set_adapters(_anames, adapter_weights=[float(weight)] * len(_anames))
                 except Exception:
                     pass
-                return "LoRA ativado: " + name + " (peso " + str(weight) + ")"
+                return "LoRA ativado: " + name + " (peso " + str(weight) + ") | Ativos: " + ", ".join(lora_active_choices())
             except Exception as e:
-                STATE["lora_stack"] = [(p, w) for (p, w) in STATE["lora_stack"] if p != local]
-                return "LoRA baixado mas falha ao aplicar (usa ComfyUI): " + str(e)[:200]
+                # NAO remove da pilha: o ComfyUI aplica o LoRA no load (fallback correto)
+                return ("LoRA baixado e na PILHA (diffusers nao aplicou: " + str(e)[:150] +
+                        ") — sera aplicado pelo ComfyUI no load. Ativos: " + ", ".join(lora_active_choices()))
         return "LoRA adicionado a pilha (backend " + str(STATE.get("backend")) + "): " + name
     except Exception as e:
         traceback.print_exc()
