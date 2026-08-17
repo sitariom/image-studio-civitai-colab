@@ -2596,6 +2596,21 @@ def comfy_run(family, ckpt, prompt, negative, width, height, steps, cfg,
     ckpt_dest = os.path.join(COMFY_DIR, "models", sub_dir, os.path.basename(ckpt))
     if os.path.abspath(ckpt) != os.path.abspath(ckpt_dest):
         Path(os.path.dirname(ckpt_dest)).mkdir(parents=True, exist_ok=True)
+        # CORRECAO: se o destino ja existe mas esta INVALIDO (copia antiga corrompida) ou nao
+        # aponta para o arquivo original atual, RECRIA — o ComfyUI le o ckpt_dest, nao o original.
+        _dest_ok = os.path.exists(ckpt_dest) and _safetensors_valid(ckpt_dest)
+        _dest_points_original = False
+        if os.path.exists(ckpt_dest):
+            try:
+                _dest_points_original = os.path.abspath(os.path.realpath(ckpt_dest)) == os.path.abspath(ckpt)
+            except Exception:
+                _dest_points_original = False
+        if os.path.exists(ckpt_dest) and (not _dest_ok or not _dest_points_original):
+            print("  [comfy] ckpt_dest invalido/desatualizado — recriando: " + os.path.basename(ckpt_dest))
+            try:
+                os.remove(ckpt_dest)
+            except Exception:
+                pass
         if not os.path.exists(ckpt_dest):
             try:
                 os.symlink(ckpt, ckpt_dest)
