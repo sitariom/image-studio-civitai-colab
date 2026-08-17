@@ -971,6 +971,7 @@ def _pick_te_file(version):
 # VAE oficial do workflow Anima (blueprint ComfyUI): circlestone-labs/Anima split_files/vae/qwen_image_vae.safetensors
 # (publico). E um WanVAE 2.1 (16ch, convs 3D) — detectado pelo ComfyUI por conteudo.
 ANIMA_VAE_URL = "https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/vae/qwen_image_vae.safetensors"
+ANIMA_TE_URL = "https://huggingface.co/Qwen/Qwen3-0.6B/resolve/main/model.safetensors"  # TE Qwen3-0.6B publico (detectado por conteudo)
 ANIMA_VAE_BYTES = 253806246
 
 def _anima_vae_valid(path):
@@ -2334,6 +2335,9 @@ def comfy_ensure_aux_files(template, family):
         vae_src = STATE.get("anima_vae_path")
         if te_src and os.path.exists(te_src):
             needs.append((os.path.basename(te_src), "clip", [te_src]))
+        else:
+            # TE nao baixou do Civitai (token/HTML/arquivo local) — mirror publico Qwen3-0.6B
+            needs.append(("anima_te.safetensors", "clip", [ANIMA_TE_URL]))
         vae_ok = bool(vae_src) and os.path.exists(vae_src) and _anima_vae_valid(vae_src)
         if vae_ok:
             needs.append(("anima_vae.safetensors", "vae", [vae_src]))
@@ -2341,8 +2345,8 @@ def comfy_ensure_aux_files(template, family):
             print("  ComfyUI aux: VAE Anima ausente/invalido em /studio — baixando oficial agora...")
             needs.append(("anima_vae.safetensors", "vae", [ANIMA_VAE_URL]))
         if not te_src and not vae_src:
-            # modelo carregado de arquivo local (sem dados do Civitai) — mensagem clara
-            needs.append(("anima_te.safetensors", "clip", []))
+            # modelo carregado de arquivo local (sem dados do Civitai) — TE via mirror publico
+            needs.append(("anima_te.safetensors", "clip", [ANIMA_TE_URL]))
     preset = FAMILY_PRESETS.get(family, {})
     cn = preset.get("controlnet")
     if cn:
@@ -2354,7 +2358,7 @@ def comfy_ensure_aux_files(template, family):
     # t5xxl_fp8 real = 4.87 GB; clip_l = 244 MB; clip_g = 1.75 GB; ae = 335 MB; sd_vae = 330 MB.
     MIN_SIZES = {"t5xxl_fp8_e4m3fn.safetensors": 2 << 30, "clip_l.safetensors": 200 << 20,
                  "clip_g.safetensors": 1 << 30, "ae.safetensors": 100 << 20,
-                 "sd_vae.safetensors": 200 << 20}
+                 "sd_vae.safetensors": 200 << 20, "anima_te.safetensors": 1 << 30}
     for fname, sub, urls in needs:
         dest = os.path.join(COMFY_DIR, "models", sub, fname)
         # VAE Anima: exige formato WanVAE 2.1 (header-check) — arquivo diffusers antigo (Qwen/Qwen-Image)
