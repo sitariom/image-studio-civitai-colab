@@ -7,6 +7,22 @@ Agora com UMA UNICA CELULA de execucao (o usuario roda so ela):
 """
 import json
 
+import sys as _sys, os as _os, json as _js
+_SANITIZE = "--sanitize" in _sys.argv
+_TK = {}
+_tk_path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "_local_secrets_backup", "tokens_reais.json")
+if _os.path.exists(_tk_path) and not _SANITIZE:
+    try:
+        _TK = _js.load(open(_tk_path, encoding="utf-8"))
+        print("tokens reais carregados (local, fora do git)")
+    except Exception:
+        _TK = {}
+elif _SANITIZE:
+    print("modo sanitize: placeholders (para commit publico)")
+
+_CIV = _TK.get("civitai") or "SEU_TOKEN_CIVITAI"
+_HF = _TK.get("hf") or "SEU_TOKEN_HF"
+
 APP = "universal_app.py"
 OUT = "Notebook_Definitivo_CivitAI.ipynb"
 app_src = open(APP, encoding="utf-8").read()
@@ -24,8 +40,8 @@ cell_run = (
 "        del sys.modules[mod]\n"
 "gc.collect()\n"
 "# 🔑 API keys (idempotente — com fallback para pre-preenchimento automatico)\n"
-"os.environ['CIVITAI_TOKEN'] = os.environ.get('CIVITAI_TOKEN') or 'SEU_TOKEN_CIVITAI'\n"
-"os.environ['HF_TOKEN'] = os.environ.get('HF_TOKEN') or 'SEU_TOKEN_HF'\n"
+"os.environ['CIVITAI_TOKEN'] = os.environ.get('CIVITAI_TOKEN') or '" + _CIV + "'\n"
+"os.environ['HF_TOKEN'] = os.environ.get('HF_TOKEN') or '" + _HF + "'\n"
 "os.makedirs('/content/studio', exist_ok=True)\n"
 "_json.dump({'civitai': os.environ['CIVITAI_TOKEN'], 'hf': os.environ['HF_TOKEN']},\n"
 "           open('/content/studio/tokens.json', 'w'))\n"

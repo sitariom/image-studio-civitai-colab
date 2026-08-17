@@ -47,8 +47,8 @@ def main():
     if version:
         bump_version(version)
 
-    print("[2/5] Regenerando notebook...")
-    run([sys.executable, "_gerar_notebook.py"])
+    print("[2/5] Regenerando notebook (sanitizado p/ commit)...")
+    run([sys.executable, "_gerar_notebook.py", "--sanitize"])
 
     print("[3/5] Validando roundtrip + AST...")
     check = '''
@@ -73,6 +73,12 @@ print("roundtrip OK | app:", len(disk), "chars")
 
     print("[5/5] Release concluido:", msg)
     print("     Ver em https://github.com/sitariom/image-studio-civitai-colab")
+    # Regenera local COM tokens reais (uso no Colab) — nunca commitar tokens
+    try:
+        run([sys.executable, "_gerar_notebook.py"])
+        print("     Notebook local regenerado COM tokens reais (uso no Colab).")
+    except Exception as e:
+        print("     Aviso: falha ao regenerar com tokens:", str(e)[:100])
 
 if __name__ == "__main__":
     main()
