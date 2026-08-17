@@ -4309,20 +4309,43 @@ def query_aux_click(url, civ_token, wanted_type):
     except Exception as e:
         traceback.print_exc()
         return "Erro: " + str(e), gr.update(choices=[], value=None), ""
-def lora_load_click(url, token, ver, weight, progress=gr.Progress()):
+def _resolve_aux_url(example_choice, url_text, examples):
+    """Fonte de verdade: se o usuario escolheu um EXEMPLO no dropdown, usa a URL
+    DAQUELE exemplo (ignora o textbox que pode estar desatualizado de outra selecao)."""
+    if example_choice:
+        for _n, _u in examples:
+            if example_choice == _n:
+                return _u
+    return (url_text or "").strip()
+
+
+def lora_load_click(example, url, token, ver, weight, progress=gr.Progress()):
     try:
-        st = load_lora_from_civitai(url, token, float(weight or 1.0), _idx_from_dd(ver))
+        real = _resolve_aux_url(example, url, LORA_EXAMPLES)
+        if not real:
+            return "Selecione um exemplo ou informe a URL/ID do LoRA."
+        st = load_lora_from_civitai(real, token, float(weight or 1.0), _idx_from_dd(ver))
         return st + " | Ativos: " + (", ".join(lora_active_choices()) or "(nenhum)")
     except Exception as e:
         return "Erro: " + str(e)
-def vae_load_click(url, token, ver, progress=gr.Progress()):
+
+
+def vae_load_click(example, url, token, ver, progress=gr.Progress()):
     try:
-        return load_vae_from_civitai(url, token, _idx_from_dd(ver))
+        real = _resolve_aux_url(example, url, VAE_EXAMPLES)
+        if not real:
+            return "Selecione um exemplo ou informe a URL/ID do VAE."
+        return load_vae_from_civitai(real, token, _idx_from_dd(ver))
     except Exception as e:
         return "Erro: " + str(e)
-def ti_load_click(url, token, ver, progress=gr.Progress()):
+
+
+def ti_load_click(example, url, token, ver, progress=gr.Progress()):
     try:
-        return load_ti_from_civitai(url, token, _idx_from_dd(ver))
+        real = _resolve_aux_url(example, url, TI_EXAMPLES)
+        if not real:
+            return "Selecione um exemplo ou informe a URL/ID do TI."
+        return load_ti_from_civitai(real, token, _idx_from_dd(ver))
     except Exception as e:
         return "Erro: " + str(e)
 def lora_active_refresh():
@@ -4676,8 +4699,9 @@ with gr.Blocks(theme=gr.themes.Soft(), css=CSS, title="Advanced Multi-Model Imag
     vae_comp_refresh.click(fn=components_status, outputs=[vae_status])
     ti_comp_refresh.click(fn=components_status, outputs=[ti_status])
     lora_example.change(fn=lambda c: _ex_url_aux(c, LORA_EXAMPLES), inputs=[lora_example], outputs=[lora_url])
+    lora_example.select(fn=lambda c: _ex_url_aux(c, LORA_EXAMPLES), inputs=[lora_example], outputs=[lora_url])
     lora_query_btn.click(fn=lambda u, t: query_aux_click(u, t, "LoRA"), inputs=[lora_url, civitai_token], outputs=[lora_card, lora_ver_dd, lora_status])
-    lora_dl_btn.click(fn=lora_load_click, inputs=[lora_url, civitai_token, lora_ver_dd, lora_weight], outputs=[lora_status])
+    lora_dl_btn.click(fn=lora_load_click, inputs=[lora_example, lora_url, civitai_token, lora_ver_dd, lora_weight], outputs=[lora_status])
     lora_dl_btn.click(fn=lora_active_refresh, outputs=[lora_active_dd])
     clear_lora_btn2.click(fn=clear_lora2, outputs=[lora_status, lora_active_dd])
     lora_rm_btn.click(fn=lora_rm_click, inputs=[lora_active_dd], outputs=[lora_status, lora_active_dd])
@@ -4686,14 +4710,16 @@ with gr.Blocks(theme=gr.themes.Soft(), css=CSS, title="Advanced Multi-Model Imag
     lora_lib_load.click(fn=lora_lib_load_click, inputs=[lora_lib_dd, lora_weight], outputs=[lora_status])
     lora_lib_load.click(fn=lora_active_refresh, outputs=[lora_active_dd])
     vae_example.change(fn=lambda c: _ex_url_aux(c, VAE_EXAMPLES), inputs=[vae_example], outputs=[vae_url])
+    vae_example.select(fn=lambda c: _ex_url_aux(c, VAE_EXAMPLES), inputs=[vae_example], outputs=[vae_url])
     vae_query_btn.click(fn=lambda u, t: query_aux_click(u, t, "VAE"), inputs=[vae_url, civitai_token], outputs=[vae_card, vae_ver_dd, vae_status])
-    vae_dl_btn.click(fn=vae_load_click, inputs=[vae_url, civitai_token, vae_ver_dd], outputs=[vae_status])
+    vae_dl_btn.click(fn=vae_load_click, inputs=[vae_example, vae_url, civitai_token, vae_ver_dd], outputs=[vae_status])
     vae_lib_refresh.click(fn=lambda: lib_refresh_aux("vae"), outputs=[vae_lib_dd])
     vae_del_btn.click(fn=lib_del_aux, inputs=[vae_lib_dd], outputs=[vae_status])
     vae_lib_load.click(fn=vae_lib_load_click, inputs=[vae_lib_dd], outputs=[vae_status])
     ti_example.change(fn=lambda c: _ex_url_aux(c, TI_EXAMPLES), inputs=[ti_example], outputs=[ti_url])
+    ti_example.select(fn=lambda c: _ex_url_aux(c, TI_EXAMPLES), inputs=[ti_example], outputs=[ti_url])
     ti_query_btn.click(fn=lambda u, t: query_aux_click(u, t, "TextualInversion"), inputs=[ti_url, civitai_token], outputs=[ti_card, ti_ver_dd, ti_status])
-    ti_dl_btn.click(fn=ti_load_click, inputs=[ti_url, civitai_token, ti_ver_dd], outputs=[ti_status])
+    ti_dl_btn.click(fn=ti_load_click, inputs=[ti_example, ti_url, civitai_token, ti_ver_dd], outputs=[ti_status])
     ti_lib_refresh.click(fn=lambda: lib_refresh_aux("ti"), outputs=[ti_lib_dd])
     ti_del_btn.click(fn=lib_del_aux, inputs=[ti_lib_dd], outputs=[ti_status])
     ti_lib_load.click(fn=ti_lib_load_click, inputs=[ti_lib_dd], outputs=[ti_status])
