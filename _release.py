@@ -66,6 +66,18 @@ print("roundtrip OK | app:", len(disk), "chars")
     run([sys.executable, "-c", check])
 
     print("[4/5] Commit + push...")
+    # fail-safe: rejeita commit se tokens reais estiverem nos arquivos staged
+    import re as _re
+    _staged = subprocess.run(["git", "diff", "--cached", "--name-only"], capture_output=True, text=True).stdout
+    for _f in _staged.splitlines():
+        if _f and _f.endswith((".py", ".ipynb")):
+            try:
+                _c = open(_f, encoding="utf-8", errors="replace").read()
+                if ("31e722c6" + "1d7d631c534b23ba0f8bb57d") in _c or ("hf_NWQbI" + "EaZgaARRMOxatlQPKCFGRdxMHVmUN") in _c:
+                    print("FALHA: token encontrado em " + _f + " — rode _gerar_notebook.py --sanitize primeiro!")
+                    sys.exit(1)
+            except Exception:
+                pass
     subprocess.run(["git", "add", "-A"], check=True)
     r = subprocess.run(["git", "commit", "-m", msg], capture_output=True, text=True)
     print(r.stdout.strip().splitlines()[-1] if r.stdout else r.stderr[-200:])
