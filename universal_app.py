@@ -1837,7 +1837,7 @@ def _result_to_image(result):
     return Image.fromarray(a).convert("RGB")
 
 
-def do_generate(krea_model, prompt, negative, steps, width, height, cfg, seed):
+def do_generate(krea_model, prompt, negative, steps, width, height, cfg, seed, loras=None):
     if hasattr(krea_model, "_interrupt"):
         krea_model._interrupt = False
     if hasattr(krea_model, "pipeline") and hasattr(krea_model.pipeline, "_interrupt"):
@@ -1859,7 +1859,7 @@ def do_generate(krea_model, prompt, negative, steps, width, height, cfg, seed):
             guide_scale=guide,
             batch_size=1,
             callback=cb,
-            loras_slists={"phase1": []},
+            loras_slists={"phase1": [(x["path"], float(x["scale"])) for x in (loras or []) if os.path.exists(x.get("path", ""))]},
         )
     if result is None:
         raise RuntimeError("geracao retornou None")
@@ -1944,6 +1944,7 @@ def main():
                             int(data.get("height", 1024)),
                             float(data.get("cfg", 0.0)),
                             int(data.get("seed", 0)),
+                            loras=data.get("loras"),
                         )
                     self._send(200, {"status": "ok", "image": img_b64, "seed": int(data.get("seed", 0))})
                 except Exception as e:
@@ -2091,10 +2092,11 @@ def _proxy_worker_generate(prompt, negative, steps, width, height, cfg, seed, pr
         raise RuntimeError("Worker Krea2 inativo.")
     port = w.get("port") or KREA2_WORKER_PORT
     url = "http://127.0.0.1:" + str(port) + "/generate"
+    loras_payload = [{"path": p, "scale": float(w)} for (p, w) in (STATE.get("lora_stack") or []) if os.path.exists(p)]
     payload = {
         "prompt": prompt, "negative": negative or "", "steps": int(steps),
         "width": int(width), "height": int(height), "cfg": float(cfg or 0),
-        "seed": int(seed),
+        "seed": int(seed), "loras": loras_payload,
     }
     try:
         if os.path.exists(KREA2_WORKER_PROGRESS):
@@ -2152,6 +2154,26 @@ COMFY_PORT = 8188
 COMFY_BASE = "http://127.0.0.1:" + str(COMFY_PORT)
 _comfy_proc = None
 _comfy_lock = threading.Lock()
+
+
+
+def _safetensors_valid(path, min_size=1024):
+    """True se o arquivo parece um safetensors valido (header JSON parseavel)."""
+    try:
+        if not path or not os.path.exists(path):
+            return False
+        if os.path.getsize(path) < min_size:
+            return False
+        with open(path, "rb") as f:
+            n = struct.unpack("<Q", f.read(8))[0]
+            if n <= 0 or n > 64 * 1024 * 1024:
+                return False
+            hdr = f.read(n)
+            json.loads(hdr.decode("utf-8", errors="replace"))
+        return True
+    except Exception:
+        return False
+
 
 def _read_log_tail(path, n=40):
     try:
@@ -2519,6 +2541,11 @@ def comfy_run(family, ckpt, prompt, negative, width, height, steps, cfg,
     elif sniffed == "anima":
         family = "anima"
     template = (FAMILY_PRESETS.get(family, {}) or {}).get("comfy_template", "checkpoint")
+    if template == "checkpoint" and not _safetensors_valid(ckpt):
+        raise RuntimeError(
+            "Checkpoint invalido/corrompido em " + str(ckpt) +
+            " (nao e um safetensors valido — download parcial ou arquivo errado). " +
+            "Rebaixe o modelo ou carregue-o novamente pela aba Modelo.")
     comfy_ensure_aux_files(template, family)
     # UNETLoader (flux/sd3/anima) le de models/diffusion_models; CheckpointLoaderSimple de models/checkpoints
     sub_dir = "diffusion_models" if template in ("flux", "sd3", "anima") else "checkpoints"

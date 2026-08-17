@@ -298,7 +298,7 @@ def _result_to_image(result):
     return Image.fromarray(a).convert("RGB")
 
 
-def do_generate(krea_model, prompt, negative, steps, width, height, cfg, seed):
+def do_generate(krea_model, prompt, negative, steps, width, height, cfg, seed, loras=None):
     if hasattr(krea_model, "_interrupt"):
         krea_model._interrupt = False
     if hasattr(krea_model, "pipeline") and hasattr(krea_model.pipeline, "_interrupt"):
@@ -320,7 +320,7 @@ def do_generate(krea_model, prompt, negative, steps, width, height, cfg, seed):
             guide_scale=guide,
             batch_size=1,
             callback=cb,
-            loras_slists={"phase1": []},
+            loras_slists={"phase1": [(x["path"], float(x["scale"])) for x in (loras or []) if os.path.exists(x.get("path", ""))]},
         )
     if result is None:
         raise RuntimeError("geracao retornou None")
@@ -405,6 +405,7 @@ def main():
                             int(data.get("height", 1024)),
                             float(data.get("cfg", 0.0)),
                             int(data.get("seed", 0)),
+                            loras=data.get("loras"),
                         )
                     self._send(200, {"status": "ok", "image": img_b64, "seed": int(data.get("seed", 0))})
                 except Exception as e:
