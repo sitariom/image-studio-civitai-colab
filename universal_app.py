@@ -1126,6 +1126,18 @@ def download_from_civitai(model_id, token, wanted_type=None, version_index=0, pr
                 return local_path, base_model, model_name, family, trained_words
         download_file_stream(download_url, local_path, civitai_headers(token),
                              desc="Baixando " + safe_name, progress_cb=progress_cb, expected_bytes=expected)
+        # Auto-retry com token: se o servidor retornou HTML (modelo exige auth) e ha token no STATE,
+        # remove o lixo e baixa de novo autenticado.
+        if safe_name.endswith(".safetensors") and wanted_type in (None, "Model") and not _safetensors_valid(local_path):
+            _tk = (STATE.get("civitai_token") or "").strip()
+            if _tk and _tk != str(token or "").strip():
+                print("  [retry] download retornou HTML — tentando de novo COM token do Civitai...")
+                try:
+                    os.remove(local_path)
+                except Exception:
+                    pass
+                download_file_stream(download_url, local_path, civitai_headers(_tk),
+                                     desc="Baixando " + safe_name + " (autenticado)", progress_cb=progress_cb, expected_bytes=expected)
     if safe_name.endswith(".safetensors") and wanted_type in (None, "Model") and not _safetensors_valid(local_path):
         # Download salvo mas INVALIDO (HTML de erro / corrompido) — remove e da erro acionavel
         sz = os.path.getsize(local_path) if os.path.exists(local_path) else 0
@@ -1135,7 +1147,9 @@ def download_from_civitai(model_id, token, wanted_type=None, version_index=0, pr
             pass
         raise RuntimeError(
             "Download INVALIDO: " + safe_name + " (" + str(sz) + " bytes) nao e um safetensors valido — "
-            "o servidor provavelmente retornou HTML/erro. Tente novamente; se persistir, preencha o token do Civitai.")
+            "o servidor retornou HTML. Este modelo provavelmente EXIGE token do Civitai: "
+            "preencha o campo 'Civitai API Token' na aba Modelo com uma key valida "
+            "(civitai.com/settings/account) e tente de novo. (modelo " + str(model_id) + ")")
     if wanted_type in (None, "Model"):
         write_model_meta(local_path, base_model, model_name, family, version.get("name"), trained_words, target)
     return local_path, base_model, model_name, family, trained_words
