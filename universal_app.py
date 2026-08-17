@@ -1112,6 +1112,12 @@ def download_from_civitai(model_id, token, wanted_type=None, version_index=0, pr
         if os.path.exists(local_path) and os.path.getsize(local_path) > 1024:
             if expected and abs(os.path.getsize(local_path) - expected) > max(1024, expected * 0.02):
                 print("  WARN arquivo existente com tamanho divergente, baixando de novo: " + safe_name)
+            elif safe_name.endswith(".safetensors") and wanted_type in (None, "Model") and not _safetensors_valid(local_path):
+                print("  WARN arquivo existente INVALIDO (" + safe_name + ") — removendo e rebaixando...")
+                try:
+                    os.remove(local_path)
+                except Exception:
+                    pass
             else:
                 if progress_cb:
                     progress_cb(1, 1, "Ja baixado: " + safe_name)
@@ -1120,6 +1126,16 @@ def download_from_civitai(model_id, token, wanted_type=None, version_index=0, pr
                 return local_path, base_model, model_name, family, trained_words
         download_file_stream(download_url, local_path, civitai_headers(token),
                              desc="Baixando " + safe_name, progress_cb=progress_cb, expected_bytes=expected)
+    if safe_name.endswith(".safetensors") and wanted_type in (None, "Model") and not _safetensors_valid(local_path):
+        # Download salvo mas INVALIDO (HTML de erro / corrompido) — remove e da erro acionavel
+        sz = os.path.getsize(local_path) if os.path.exists(local_path) else 0
+        try:
+            os.remove(local_path)
+        except Exception:
+            pass
+        raise RuntimeError(
+            "Download INVALIDO: " + safe_name + " (" + str(sz) + " bytes) nao e um safetensors valido — "
+            "o servidor provavelmente retornou HTML/erro. Tente novamente; se persistir, preencha o token do Civitai.")
     if wanted_type in (None, "Model"):
         write_model_meta(local_path, base_model, model_name, family, version.get("name"), trained_words, target)
     return local_path, base_model, model_name, family, trained_words
