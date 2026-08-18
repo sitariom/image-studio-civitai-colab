@@ -1796,17 +1796,53 @@ def ensure_requirements():
 
 
 def preimport_diffusers():
-    # Fix do import circular: optimum.quanto -> diffusers_models -> PixArt -> single_file_model
-    # deixa o 'logger' indefinido ("name 'logger' is not defined"). Pre-importar o diffusers
-    # completa (e o single_file_model) ANTES do mmgp — o cache de sys.modules impede o circular.
+    # Fix NUCLEAR do import circular diffusers - optimum.quanto.
+    # O quanto importa 'from diffusers import PixArtTransformer2DModel' (lazy) -> pixart ->
+    # single_file_model -> NameError 'logger' (import circular deixa o logger indefinido).
+    # Estrategia: placeholder do PixArt + garantir 'logger' nos submodulos do diffusers.
+    import sys as _s
     try:
         import diffusers  # noqa: F401
-        import diffusers.loaders.single_file_model as _sfm  # noqa: F401
+        # (1) PLACEHOLDER do PixArtTransformer2DModel: o quanto faz
+        # 'from diffusers import PixArtTransformer2DModel' p/ registrar qmodules, mas isso
+        # dispara o lazy import -> single_file_model -> NameError 'logger'. O Krea-2 NAO usa
+        # PixArt, entao definimos um placeholder no namespace antes (o from acha o atributo,
+        # sem __getattr__ lazy -> sem import -> sem erro).
+        if not hasattr(diffusers, "PixArtTransformer2DModel"):
+            try:
+                class _PixArtPlaceholder:
+                    pass
+                diffusers.PixArtTransformer2DModel = _PixArtPlaceholder
+            except Exception:
+                pass
         from diffusers.utils import logging as _dlog
+        _dlog.set_verbosity_error()
+        # (2) garante 'logger' em todos os submodulos do diffusers (resolve NameError de import circular)
+        for _mn, _m in list(_s.modules.items()):
+            if _mn.startswith("diffusers") and _m is not None and not hasattr(_m, "logger") and hasattr(_m, "__name__"):
+                try:
+                    _m.logger = _dlog.get_logger(_mn)
+                except Exception:
+                    pass
+        # (3) importa single_file_utils + single_file_model explicitamente (define logger no fluxo normal)
+        for _imp in ("diffusers.loaders.single_file_utils", "diffusers.loaders.single_file_model"):
+            try:
+                _mm = __import__(_imp, fromlist=["x"])
+                if _mm is not None:
+                    _mm.logger = _dlog.get_logger(_imp)
+            except Exception:
+                pass
+        # (4) importa o pixart direto (nao via lazy) e registra no namespace do diffusers
         try:
-            _sfm.logger = _dlog.get_logger("diffusers.loaders.single_file_model")
-        except Exception:
-            pass
+            from diffusers.models.transformers import pixart_transformer_2d as _px
+            diffusers.PixArtTransformer2DModel = getattr(_px, "PixArtTransformer2DModel", None)
+            try:
+                import diffusers.models as _dmods
+                _dmods.PixArtTransformer2DModel = getattr(_px, "PixArtTransformer2DModel", None)
+            except Exception:
+                pass
+        except Exception as _e2:
+            log("pixart direct: " + str(_e2)[:90])
     except Exception as _e:
         log("preimport diffusers warn: " + str(_e)[:120])
 
