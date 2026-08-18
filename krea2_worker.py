@@ -225,8 +225,25 @@ def ensure_requirements():
             log("pip " + _pin + " warn: " + str(_e)[:100])
 
 
+def preimport_diffusers():
+    # Fix do import circular: optimum.quanto -> diffusers_models -> PixArt -> single_file_model
+    # deixa o 'logger' indefinido ("name 'logger' is not defined"). Pre-importar o diffusers
+    # completa (e o single_file_model) ANTES do mmgp — o cache de sys.modules impede o circular.
+    try:
+        import diffusers  # noqa: F401
+        import diffusers.loaders.single_file_model as _sfm  # noqa: F401
+        from diffusers.utils import logging as _dlog
+        try:
+            _sfm.logger = _dlog.get_logger("diffusers.loaders.single_file_model")
+        except Exception:
+            pass
+    except Exception as _e:
+        log("preimport diffusers warn: " + str(_e)[:120])
+
+
 def load_model(ckpt_path, te_path, model_name):
     # Carregamento 100% fiel ao notebook Colab: quantizeTransformer=False (modelo ja INT8)
+    preimport_diffusers()
     from mmgp import offload  # noqa: F401
     from shared.utils import files_locator as fl
     from models.krea2.krea2_handler import family_handler
